@@ -1,0 +1,27 @@
+{
+    "console": {
+        "enable": true,     
+        "level": "FINE"    
+    },  
+    "files": [{
+        "enable": true,
+        "level": "INFO",
+        "filename":"./info.log",
+        "category": "Info",         
+        "pattern": "[%D %T] [%L] (%S) %M",   
+        "rotate": true,                            
+        "maxsize": "500M",
+        "maxlines": "10K",
+        "daily": true  
+    },{ 
+        "enable": true,
+        "level": "DEBUG",
+        "filename":"./error.log",
+        "category": "Error",
+        "pattern": "[%D %T] [%L] (%S) %M",
+        "rotate": true,                            
+        "maxsize": "500M",
+        "maxlines": "10K",
+        "daily": true
+    }]
+}

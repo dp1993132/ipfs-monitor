@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"ipfs-monitor/command"
+	"ipfs-monitor/log"
 	"ipfs-monitor/pinner"
 	"ipfs-monitor/signer"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,7 +16,7 @@ import (
 
 var Report_URL string
 
-var stdlog, errlog *log.Logger
+//var stdlog, errlog *log.Logger
 
 type Request struct {
 	Data      *RequestData `json:"data"`
@@ -46,8 +46,8 @@ type Response struct {
 }
 
 func init() {
-	stdlog = log.New(os.Stdout, "", log.Ldate|log.Ltime)
-	errlog = log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	// stdlog = log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	// errlog = log.New(os.Stderr, "", log.Ldate|log.Ltime)
 }
 
 func init() {
@@ -66,21 +66,25 @@ func init() {
 }
 
 func Report() ([]byte, error) {
-	stdlog.Println("Prepare information of IPFS node for reporting status to server...")
+	//stdlog.Println("Prepare information of IPFS node for reporting status to server...")
+	log.WriteInfoLog("Prepare information of IPFS node for reporting status to server...")
 	peerId, _ := command.GetPeerID()
 	node_external_id, err := command.GetPeerID()
 	if err != nil {
-		errlog.Println("Get peer ID failed, error: ", err)
+		//errlog.Println("Get peer ID failed, error: ", err)
+		log.WriteErrorLog("Get peer ID failed, error: %s", err)
 		return nil, err
 	}
 	publickey, err := command.GetPubKey()
 	if err != nil {
-		errlog.Println("Get public key failed, error: ", err)
+		//errlog.Println("Get public key failed, error: ", err)
+		log.WriteErrorLog("Get public key failed, error: %s", err)
 		return nil, err
 	}
 	keys, sizes, err := command.GetPinedList()
 	if err != nil {
-		errlog.Println("Get pined file list failed, error: ", err)
+		//errlog.Println("Get pined file list failed, error: ", err)
+		log.WriteErrorLog("Get pined file list failed, error: %s", err)
 		return nil, err
 	}
 	items := make([]Item, len(keys))
@@ -92,17 +96,20 @@ func Report() ([]byte, error) {
 	needPinNum := pinner.GetNeedTaskNum()
 	available_space, err := command.GetFreeSpace()
 	if err != nil {
-		errlog.Println("Get free space failed, error: ", err)
+		//errlog.Println("Get free space failed, error: ", err)
+		log.WriteErrorLog("Get free space failed, error: %s", err)
 		return nil, err
 	}
 	throughput, err := command.GetThroughput()
 	if err != nil {
-		errlog.Println("Get throughput failed, error: ", err)
+		//errlog.Println("Get throughput failed, error: ", err)
+		log.WriteErrorLog("Get throughput failed, error: %s", err)
 		return nil, err
 	}
 	timestampstr, err := readTimestamp()
 	if err != nil {
-		errlog.Println("Read timestamp failed, error: ", err)
+		//errlog.Println("Read timestamp failed, error: ", err)
+		log.WriteErrorLog("Read timestamp failed, error: %s", err)
 		return nil, err
 	}
 	timestamp, _ := strconv.ParseUint(timestampstr, 10, 64)
@@ -124,37 +131,46 @@ func Report() ([]byte, error) {
 	dataJson, err := json.Marshal(request.Data)
 	pinner.FailList = nil //reset failList
 	if err != nil {
-		errlog.Println("Report status to server failed, error: ", err)
+		//errlog.Println("Report status to server failed, error: ", err)
+		log.WriteErrorLog("Report status to server failed, error: %s", err)
 		return nil, err
 	}
 	signature, err := signer.Sign(string(dataJson[:]))
 	if err != nil {
-		errlog.Println("Report status to server failed, error: ", err)
+		//errlog.Println("Report status to server failed, error: ", err)
+		log.WriteErrorLog("Report status to server failed, error: %s", err)
 		return nil, err
 	}
 	request.Signature = hex.EncodeToString(signature)
 	requestJson, err := json.Marshal(request)
 	if err != nil {
-		errlog.Println("Report status to server failed, error: ", err)
+		//errlog.Println("Report status to server failed, error: ", err)
+		log.WriteErrorLog("Report status to server failed, error: %s", err)
 		return nil, err
 	}
-	stdlog.Println("Ready for report IPFS node status: ", string(requestJson))
-	stdlog.Println("需要任务:", needPinNum)
+	//stdlog.Println("Ready for report IPFS node status: ", string(requestJson))
+	log.WriteInfoLog("Ready for report IPFS node status: %s", string(requestJson))
+	//stdlog.Println("需要任务:", needPinNum)
+	log.WriteInfoLog("需要任务: %d", needPinNum)
 	command.IpfsPub(peerId+"-log-request", string(requestJson))
 	responseJson, err := doBytesPost(Report_URL, requestJson)
 	if err != nil {
-		errlog.Println("Report status to server failed, error: ", err)
+		//errlog.Println("Report status to server failed, error: ", err)
+		log.WriteErrorLog("Report status to server failed, error: %s", err)
 		return nil, err
 	}
-	stdlog.Println("Sending status successful, retrieving response from server: ", string(responseJson))
+	//stdlog.Println("Sending status successful, retrieving response from server: ", string(responseJson))
+	log.WriteInfoLog("Sending status successful, retrieving response from server: %s", string(responseJson))
 	command.IpfsPub(peerId+"-log-response", string(responseJson))
 	var response Response
 	if err := json.NewDecoder(bytes.NewReader(responseJson)).Decode(&response); err != nil {
-		errlog.Println("Decode response from server failed, error: ", err)
+		//errlog.Println("Decode response from server failed, error: ", err)
+		log.WriteErrorLog("Decode response from server failed, error: %s", err)
 		return nil, err
 	}
 	if writeTimestamp(strconv.FormatUint(response.CurrentTimestamp, 10)) != nil {
-		errlog.Println("Write timestamp failed, error: ", err)
+		//errlog.Println("Write timestamp failed, error: ", err)
+		log.WriteErrorLog("Write timestamp failed, error: %s", err)
 		return nil, err
 	}
 	pinner.PinAsync(response.PinHash)

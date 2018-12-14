@@ -5,9 +5,8 @@ import (
 	"io/ioutil"
 	"ipfs-monitor/command"
 	"ipfs-monitor/config"
+	"ipfs-monitor/log"
 	"ipfs-monitor/queue"
-	"log"
-	"os"
 	"sync"
 )
 
@@ -21,11 +20,11 @@ var syncQueue = queue.NewSyncQueue() // 待处理任务队列
 var resQueue = queue.NewSyncQueue()  //处理结果队列
 var pinningList [2]string
 
-var stdlog, errlog *log.Logger
+// var stdlog, errlog *log.Logger
 
 func init() {
-	stdlog = log.New(os.Stdout, "", log.Ldate|log.Ltime)
-	errlog = log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	// stdlog = log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	// errlog = log.New(os.Stderr, "", log.Ldate|log.Ltime)
 	ReadPinningTask()
 	PinAsync(pinningList[:])
 }
@@ -94,7 +93,8 @@ func handleTask(i int) {
 		err := command.GetFile(task.Hash, ioutil.Discard, func(reads int64, total int64) {
 			if (100*reads/total - progress) >= 5 {
 				progress = 100 * reads / total
-				stdlog.Printf("File: %s has downloaded %d", task.Hash, progress)
+				//stdlog.Printf("File: %s has downloaded %d", task.Hash, progress)
+				log.WriteInfoLog("File: %s has downloaded %d", task.Hash, progress)
 				peerId, _ := command.GetPeerID()
 				command.IpfsPub(peerId+"-download-"+task.Hash+"log", string(progress))
 			}
@@ -111,13 +111,16 @@ func handleTask(i int) {
 				task.Status = 1
 			}
 		} else {
-			stdlog.Println("Pinning file: ", task, GetNeedTaskNum(), PinningFileSize())
+			//stdlog.Println("Pinning file: ", task, GetNeedTaskNum(), PinningFileSize())
+			log.WriteInfoLog("Pinning file: ", task, GetNeedTaskNum(), PinningFileSize())
 			_, err = command.PinFile(task.Hash)
 			if err != nil {
-				errlog.Printf("Pin file %s failed, error: %s\n", task.Hash, err)
+				//errlog.Printf("Pin file %s failed, error: %s\n", task.Hash, err)
+				log.WriteErrorLog("Pin file %s failed, error: %s\n", task.Hash, err)
 				task.Status = 2
 			} else {
-				stdlog.Printf("Pin file %s successed.\n", task.Hash)
+				//stdlog.Printf("Pin file %s successed.\n", task.Hash)
+				log.WriteInfoLog("Pin file %s successed.\n", task.Hash)
 				task.Status = 0
 			}
 		}
@@ -135,17 +138,21 @@ func handleResults() {
 			pinningCount--
 			lock.Unlock()
 			if task.Status == 0 {
-				stdlog.Printf("任务：%s pin 成功", task.Hash)
+				//stdlog.Printf("任务：%s pin 成功", task.Hash)
+				log.WriteInfoLog("任务：%s pin 成功", task.Hash)
 			}
 			if task.Status == 2 {
 				FailList = append(FailList, FailItem{task.Hash, 1, "Request time out"})
-				errlog.Printf("任务：%s 连接矿工失败 返回失败", task.Hash)
+				//errlog.Printf("任务：%s 连接矿工失败 返回失败", task.Hash)
+				log.WriteErrorLog("任务：%s 连接矿工失败 返回失败", task.Hash)
 			} else if task.Status == 1 {
 				FailList = append(FailList, FailItem{task.Hash, 1, "Download time out"})
-				errlog.Printf("任务：%s 尝试下载失败3次 返回失败", task.Hash)
+				//errlog.Printf("任务：%s 尝试下载失败3次 返回失败", task.Hash)
+				log.WriteErrorLog("任务：%s 尝试下载失败3次 返回失败", task.Hash)
 			}
 		} else {
-			errlog.Printf("任务：%s 尝试下载失败%d次", task.Hash, task.TimeoutCount)
+			//errlog.Printf("任务：%s 尝试下载失败%d次", task.Hash, task.TimeoutCount)
+			log.WriteErrorLog("任务：%s 尝试下载失败%d次", task.Hash, task.TimeoutCount)
 			syncQueue.Push(*task)
 		}
 	}
